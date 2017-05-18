@@ -8,59 +8,44 @@ import hashlib  # for random
 import time  # for random
 import configparser # for config settings
 
-# import speechRecognition #speech stuff
+# bot instantiator
+bot = commands.Bot(command_prefix='!', description='The test BuckeyeLAN bot')
 
-#method to load important lines from bot.ini file
+# Non-async methods
+
+# method to load important lines from bot.ini file
 def loadBotFile():
     config = configparser.ConfigParser()
     if not os.path.isfile('bot.ini'):
         with open('bot.ini', 'w') as f:
             f.write('[DISCORD]\ntoken=')
-            toke = input("File was not found. Please enter the token: ")
+            toke = input("Config file was not found. Please enter the token: ")
             f.write(toke)
     config.read('bot.ini')
     return config
-
-config = loadBotFile()
-conn = sqlite3.connect('testbot_db.sqlite')  # sqlite connection
-c = conn.cursor()  # sqlite communication cursor
-points_cursor = conn.cursor()  # background cursor to reduce command conflicts
-masterDBList = {}  # List of folders in the same directory as the bot
-bonusDBList = {}  # List of nested bonus folders
-textChatIDlist = ["107942843787558912", "304111440489480194"]  # bssm and bot-testing id
-
-# a whole bunch of nonsense to get somewhat better random values
-timeCounter = str(time.time())
-timeCounter = timeCounter.encode('utf-8')
-sudoRandom = hashlib.sha256(timeCounter).hexdigest()
-random.seed(sudoRandom)
-
-# bot instantiator
-bot = commands.Bot(command_prefix='!', description='The test BuckeyeLAN bot')
-
-
-# prints to console when bot starts up
-@bot.event
-async def on_ready():
-    print('Logged in as')
-    print(bot.user.name)
-    print(bot.user.id)
-    print('------')
-
-
+    
 # checks if a table exists
 def checkTableExists(tableName):
     c.execute("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?", (tableName,))
     # Returns the query result. 0 for does not exist. 1 for exists.
     return c.fetchone()[0]
+    
+# Async methods
 
+# prints to console when bot starts up
+@bot.event
+async def on_ready():
+    print("Logged in as")
+    print(bot.user.name)
+    print(bot.user.id)
+    print("------")
 
 # increments points for each user currently in the channel every 60s
 async def pointsBackgroundTask():
     await bot.wait_until_ready()
     #list of channel ids, or chads
-    chads = ["107942844055994368", "107945609515778048", "263859347908460544"]
-    if not checkTableExists("Points"):
+    chads = ['107942844055994368', '107945609515778048', '263859347908460544']
+    if not checkTableExists('Points'):
         points_cursor.execute("""CREATE TABLE "Points" ("UserID" VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE, "numPoints" INTEGER NOT NULL DEFAULT 0)""")
     while not bot.is_closed:
         for server in bot.servers:
@@ -70,7 +55,7 @@ async def pointsBackgroundTask():
                     points += 1
                 if member.status == discord.enums.Status.online and member.id != bot.user.id:
                     points += 2
-                if str(member.game) != "None":
+                if str(member.game) != 'None':
                     points += 1
                 await addPoints(member.id, points)
         await asyncio.sleep(60)
@@ -79,12 +64,12 @@ async def pointsBackgroundTask():
 # adds points to a user
 # e.g. addPoints(member.id, 1)
 async def addPoints(userID, numPoints):
-    points_cursor.execute("SELECT * FROM Points WHERE UserID = ?", (str(userID),))
+    points_cursor.execute('SELECT * FROM Points WHERE UserID = ?', (str(userID),))
     if points_cursor.fetchone() is None:
-        points_cursor.execute("INSERT INTO Points (UserID, numPoints) VALUES (?, 0)", (str(userID),))
+        points_cursor.execute('INSERT INTO Points (UserID, numPoints) VALUES (?, 0)', (str(userID),))
         conn.commit()
     points_cursor.fetchall()
-    points_cursor.execute("UPDATE Points SET numPoints = numPoints + ? WHERE UserID = ?",
+    points_cursor.execute('UPDATE Points SET numPoints = numPoints + ? WHERE UserID = ?',
                           (int(numPoints), str(userID),))
     conn.commit()
 
@@ -92,12 +77,12 @@ async def addPoints(userID, numPoints):
 # removes points from a user
 # e.g. deductPoints(member.id, 1)
 async def deductPoints(userID, numPoints):
-    points_cursor.execute("SELECT * FROM Points WHERE UserID = ?", (str(userID),))
+    points_cursor.execute('SELECT * FROM Points WHERE UserID = ?', (str(userID),))
     if points_cursor.fetchone() is None:
-        points_cursor.execute("INSERT INTO Points (UserID, numPoints) VALUES (?, 0)", (str(userID),))
+        points_cursor.execute('INSERT INTO Points (UserID, numPoints) VALUES (?, 0)', (str(userID),))
         conn.commit()
     points_cursor.fetchall()
-    points_cursor.execute("UPDATE Points SET numPoints = numPoints - ? WHERE UserID = ?",
+    points_cursor.execute('UPDATE Points SET numPoints = numPoints - ? WHERE UserID = ?',
                           (int(numPoints), str(userID),))
     conn.commit()
 
@@ -105,7 +90,7 @@ async def deductPoints(userID, numPoints):
 # tests if bot is actually functioning
 @bot.command()
 async def test():
-    await bot.say('Fuck Scott')
+    await bot.say("Fuck Scott")
 
 
 # prints how many points the user has that issued the command
@@ -113,7 +98,7 @@ async def test():
 async def points(ctx):
     userID = ctx.message.author.id
     name = ctx.message.author.name
-    c.execute("SELECT numPoints FROM Points WHERE UserID = ?", (str(userID),))
+    c.execute('SELECT numPoints FROM Points WHERE UserID = ?', (str(userID),))
     points = c.fetchone()
     c.fetchall()
     if points is None:
@@ -125,7 +110,7 @@ async def points(ctx):
 # prints the top five point holders
 @bot.command()
 async def leaderboard():
-    c.execute("SELECT UserID, numPoints FROM Points ORDER BY numPoints DESC LIMIT 5")
+    c.execute('SELECT UserID, numPoints FROM Points ORDER BY numPoints DESC LIMIT 5')
     leaders = c.fetchall()
     boardstring = "\n__***LEADERBOARD***__\n"
     position = 1
@@ -141,18 +126,19 @@ async def leaderboard():
 # plays a 50% winrate game with double prize payout for the user
 # e.g. !roulette 50
 # e.g. !roulette all
+# e.g. !roulette some
 @bot.command(pass_context=True)
 async def roulette(ctx, amount: str):
     userID = ctx.message.author.id
     name = ctx.message.author.name
-    c.execute("SELECT numPoints FROM Points WHERE UserID = ?", (str(userID),))
+    c.execute('SELECT numPoints FROM Points WHERE UserID = ?', (str(userID),))
     points = c.fetchone()
     c.fetchall()
 
     points = int(points[0])
-    if amount.strip().lower() == "all":
+    if amount.strip().lower() == 'all':
         amount = points
-    elif amount.strip().lower() == "some":
+    elif amount.strip().lower() == 'some':
         if points != 0:
             num = random.randint(1, points)
             amount = num
@@ -160,7 +146,6 @@ async def roulette(ctx, amount: str):
             amount = 0
     else:
         amount = int(float(amount))
-
     if points is None or points == 0:
         await bot.say("You have no points to wager!")
     elif amount <= 0:
@@ -184,11 +169,11 @@ async def roulette(ctx, amount: str):
 @bot.command()
 async def quote():
     # Checks if table exists first. Prints a random result if it does.
-    if not checkTableExists("quotes"):
+    if not checkTableExists('quotes'):
         await bot.say("Quote table does not exist");
     else:
         cursor = c.execute('''SELECT * FROM quotes ORDER BY RANDOM() LIMIT 1''')
-        # should pick out the second  and third fields of what the command returns
+        # should pick out the first  and second fields of what the command returns
         returned = c.fetchall().pop()
         attributor = returned[0]
         quote = returned[1]
@@ -203,10 +188,10 @@ async def addquote(ctx, quote: str, attributor: str):
     channelID = ctx.message.channel.id
     if channelID in textChatIDlist:
         # Checks if table exists before adding quote. Creates table if it does not.
-        if not checkTableExists("quotes"):
+        if not checkTableExists('quotes'):
             c.execute(
                 '''CREATE TABLE "quotes" ( `ID` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE, `attributor` text NOT NULL, `quote` text NOT NULL )''')
-        c.execute("INSERT INTO quotes (quote, attributor) VALUES (?, ?);", (quote, attributor))
+        c.execute('INSERT INTO quotes (quote, attributor) VALUES (?, ?);', (quote, attributor))
     conn.commit()
 
 
@@ -216,30 +201,61 @@ async def plays(ctx, game: str):
     if set('[~!@#$%^&*()_+{}":;\']+$').intersection(game):
         await bot.say("No special characters!")
     else:
-        c.execute("SELECT codes FROM Games")
+        c.execute('SELECT * FROM Games')
         games = c.fetchall()
         if game.upper() not in games:
             await bot.say("That game is either not supported or you did not use the appropriate game code.")
+            
         else:
-            c.execute("SELECT " + game.upper() + " FROM GameUsers")
+            c.execute('SELECT * FROM ' + game.upper())
             names = c.fetchall()
             boardstring = "\n__" + game.upper() + "__\n"
             for name in names:
-                boardstring += "{}\n".format(name)
+                boardstring += "@{}\n".format(name)
             await bot.say(boardstring)
 
 # assign yourself to a game
 @bot.command(pass_context=True)
-async def iplay(ctx, game: str):
-    if set('[~!@#$%^&*()_+{}":;\']+$').intersection(game):
+async def iplay(ctx, game = None):
+    if game is None:
+        await bot.say("You didn't even enter anything!")
+    elif set('[~!@#$%^&*()_+{}":;\']+$').intersection(game):
         await bot.say("No special characters!")
     else:
-        c.execute("SELECT codes FROM Games")
+        c.execute('SELECT * FROM Games WHERE codes LIKE \"' + game.upper() + '"')
         games = c.fetchall()
-        if game.upper() not in games:
+        if len(games) is 0:
             await bot.say("That game is either not supported or you did not use the appropriate game code.")
         else:
-            c.execute()
+            c.execute('SELECT user FROM ' + game.upper())
+            users = c.fetchall()
+            new = True
+            for user in users:
+                if user[0] is ctx.message.author.id and new:
+                    new = False
+
+            if new:
+                c.execute('INSERT INTO ' + game.upper() + ' VALUES (\'' + ctx.message.author.id + '\')')
+                await bot.say("You've been added!")
+                conn.commit()
+            else:
+                await bot.say("You're already on this game list!")  
+
+# keep these on the bottom so any methods called here are already parsed at compile-time
+config = loadBotFile()
+conn = sqlite3.connect('testbot_db.sqlite')  # sqlite connection
+c = conn.cursor()  # sqlite communication cursor
+points_cursor = conn.cursor()  # background cursor to reduce command conflicts
+masterDBList = {}  # List of folders in the same directory as the bot
+bonusDBList = {}  # List of nested bonus folders
+textChatIDlist = ['107942843787558912', '304111440489480194']  # bssm and bot-testing id
+
+# a whole bunch of nonsense to get somewhat better random values
+timeCounter = str(time.time())
+timeCounter = timeCounter.encode('utf-8')
+sudoRandom = hashlib.sha256(timeCounter).hexdigest()
+random.seed(sudoRandom)
+
     
 # These need to be at the bottom
 # sets up loop
